@@ -1,0 +1,3 @@
+C:\msys64\mingw64\bin\cmake.exe -E rm -f CMakeFiles\ml.dir/objects.a
+C:\msys64\mingw64\bin\ar.exe qc CMakeFiles\ml.dir/objects.a @CMakeFiles\ml.dir\objects1.rsp
+C:\msys64\mingw64\bin\cc.exe -shared -o ml.so -Wl,--out-implib,libml.dll.a -Wl,--major-image-version,0,--minor-image-version,0 -Wl,--whole-archive CMakeFiles\ml.dir/objects.a -Wl,--no-whole-archive @CMakeFiles\ml.dir\linkLibs.rsp
