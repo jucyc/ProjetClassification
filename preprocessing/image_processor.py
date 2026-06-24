@@ -83,7 +83,7 @@ class ImageProcessor:
         X, y = self.load_dataset(data_dir, normalize=True)
         
         if len(X) == 0:
-            print("❌ Aucune image chargée !")
+            print("Aucune image chargée !")
             return None, None, None, None
         
         from sklearn.model_selection import train_test_split
@@ -105,7 +105,7 @@ class ImageProcessor:
         print(f"y_train.npy: {y_train.shape}")
         print(f"X_test.npy:  {X_test.shape}")
         print(f"y_test.npy:  {y_test.shape}")
-        print(f"\n✅ Donnees sauvegardees dans: {output_dir}/")
+        print(f"\nDonnees sauvegardees dans: {output_dir}/")
         
         return X_train, y_train, X_test, y_test
 
@@ -116,7 +116,7 @@ def main():
     output_dir = os.path.join(project_dir, "test_cases")
     
     if not os.path.exists(data_dir):
-        print(f"❌ Dossier data/raw non trouve: {data_dir}")
+        print(f"Dossier data/raw non trouve: {data_dir}")
         sys.exit(1)
     
     processor = ImageProcessor(target_size=(32, 32))
@@ -128,12 +128,12 @@ def main():
     )
     
     if X_train is not None:
-        print("\n✅ Pretraitement termine avec succes !")
+        print("\nPretraitement termine avec succes !")
         print(f"   Train: {X_train.shape[0]} images")
         print(f"   Test:  {X_test.shape[0]} images")
         print(f"   Features: {X_train.shape[1]}")
     else:
-        print("\n❌ Le pretraitement a echoue.")
+        print("\nLe pretraitement a echoue.")
 
 if __name__ == "__main__":
     main()
