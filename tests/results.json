@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Test du modele lineaire",
+    "script": "test_linear.py",
+    "success": true,
+    "time": "2026-06-24T14:43:17.554764"
+  },
+  {
+    "name": "Test du MLP",
+    "script": "test_mlp.py",
+    "success": true,
+    "time": "2026-06-24T14:43:24.660355"
+  }
+]

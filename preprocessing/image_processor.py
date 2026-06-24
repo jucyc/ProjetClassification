@@ -4,7 +4,7 @@ from PIL import Image
 from tqdm import tqdm
 
 class ImageProcessor:
-    def __init__(self, target_size=(128, 128)):
+    def __init__(self, target_size=(32, 32)):
         self.target_size = target_size
         self.class_names = ['taj_mahal', 'great_wall', 'christ_redeemer']
         self.class_to_label = {name: i for i, name in enumerate(self.class_names)}
@@ -12,30 +12,12 @@ class ImageProcessor:
         self.std = None
     
     def extract_features(self, image_path):
-        """Extrait des caractéristiques d'une image"""
-        img = Image.open(image_path).convert('RGB')
+        """Extrait les pixels bruts de l'image (pour le MLP)"""
+        img = Image.open(image_path).convert('L')  # Niveaux de gris
         img = img.resize(self.target_size)
         img_array = np.array(img, dtype=np.float32)
-        
-        # 1. Histogramme de couleurs
-        hist_features = []
-        for channel in range(3):
-            hist, _ = np.histogram(img_array[:, :, channel].flatten(), bins=16, range=(0, 256))
-            hist = hist / (np.sum(hist) + 1e-7)
-            hist_features.extend(hist)
-        
-        # 2. Statistiques de base
-        gray = np.mean(img_array, axis=2)
-        mean_val = np.mean(gray) / 255.0
-        std_val = np.std(gray) / 255.0
-        
-        # 3. Gradients
-        gy, gx = np.gradient(gray)
-        gradient_magnitude = np.sqrt(gx**2 + gy**2)
-        grad_mean = np.mean(gradient_magnitude) / 255.0
-        grad_std = np.std(gradient_magnitude) / 255.0
-        
-        features = np.concatenate([hist_features, [mean_val, std_val, grad_mean, grad_std]])
+        # Aplatir et normaliser
+        features = img_array.flatten() / 255.0
         return features
     
     def normalize(self, X, fit=True):
@@ -87,3 +69,71 @@ class ImageProcessor:
         print(f"   Dimensions: {X.shape}")
         
         return X, y
+    
+    def save_processed_data(self, data_dir, output_dir="test_cases", test_size=0.2, random_state=42):
+        """Charge, normalise et sauvegarde les données prétraitées"""
+        print("="*50)
+        print("PRETRAITEMENT DES IMAGES")
+        print("="*50)
+        print(f"Source: {data_dir}")
+        print(f"Sortie: {output_dir}/")
+        print(f"Test size: {test_size}")
+        print("="*50)
+        
+        X, y = self.load_dataset(data_dir, normalize=True)
+        
+        if len(X) == 0:
+            print("❌ Aucune image chargée !")
+            return None, None, None, None
+        
+        from sklearn.model_selection import train_test_split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=random_state, stratify=y
+        )
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        np.save(os.path.join(output_dir, "X_train.npy"), X_train)
+        np.save(os.path.join(output_dir, "y_train.npy"), y_train)
+        np.save(os.path.join(output_dir, "X_test.npy"), X_test)
+        np.save(os.path.join(output_dir, "y_test.npy"), y_test)
+        
+        print("\n" + "="*50)
+        print("SAUVEGARDE")
+        print("="*50)
+        print(f"X_train.npy: {X_train.shape}")
+        print(f"y_train.npy: {y_train.shape}")
+        print(f"X_test.npy:  {X_test.shape}")
+        print(f"y_test.npy:  {y_test.shape}")
+        print(f"\n✅ Donnees sauvegardees dans: {output_dir}/")
+        
+        return X_train, y_train, X_test, y_test
+
+def main():
+    import sys
+    project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(project_dir, "data", "raw")
+    output_dir = os.path.join(project_dir, "test_cases")
+    
+    if not os.path.exists(data_dir):
+        print(f"❌ Dossier data/raw non trouve: {data_dir}")
+        sys.exit(1)
+    
+    processor = ImageProcessor(target_size=(32, 32))
+    X_train, y_train, X_test, y_test = processor.save_processed_data(
+        data_dir=data_dir,
+        output_dir=output_dir,
+        test_size=0.2,
+        random_state=42
+    )
+    
+    if X_train is not None:
+        print("\n✅ Pretraitement termine avec succes !")
+        print(f"   Train: {X_train.shape[0]} images")
+        print(f"   Test:  {X_test.shape[0]} images")
+        print(f"   Features: {X_train.shape[1]}")
+    else:
+        print("\n❌ Le pretraitement a echoue.")
+
+if __name__ == "__main__":
+    main()

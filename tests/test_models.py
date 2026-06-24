@@ -56,8 +56,6 @@ def test_xor():
     accuracy = correct / len(X)
     print(f"Précision: {accuracy:.2%}")
     
-    # Le modèle linéaire ne peut pas résoudre XOR
-    # Donc on attend une précision <= 75%
     return accuracy <= 0.75
 
 def test_image_features():
@@ -67,8 +65,8 @@ def test_image_features():
     
     processor = ImageProcessor()
     
-    # Tester avec une image (à adapter avec ton chemin)
-    test_image_path = "data/raw/taj_mahal/sample.jpg"  # À remplacer par une vraie image
+
+    test_image_path = "data/raw/taj_mahal/sample.jpg"  
     
     if os.path.exists(test_image_path):
         features = processor.extract_combined_features(test_image_path)
@@ -86,21 +84,21 @@ if __name__ == "__main__":
     
     # Test 1: Classification linéaire (doit réussir)
     if test_linear_classification():
-        print("✓ Classification linéaire: OK")
+        print("Classification linéaire: OK")
     else:
-        print("✗ Classification linéaire: KO")
+        print(" lassification linéaire: KO")
         success = False
     
     # Test 2: XOR (doit échouer pour le modèle linéaire)
     if test_xor():
-        print("✓ XOR (modèle linéaire): OK (normalement échoue)")
+        print("XOR (modèle linéaire): OK (normalement échoue)")
     else:
-        print("✗ XOR (modèle linéaire): KO (aurait dû échouer)")
+        print("XOR (modèle linéaire): KO (aurait dû échouer)")
     
     # Test 3: Extraction de features
     test_image_features()
     
     if success:
-        print("\n✓ TOUS LES TESTS RÉUSSIS")
+        print("\nTOUS LES TESTS RÉUSSIS")
     else:
-        print("\n✗ CERTAINS TESTS ONT ÉCHOUÉ")
+        print("\nCERTAINS TESTS ONT ÉCHOUÉ")

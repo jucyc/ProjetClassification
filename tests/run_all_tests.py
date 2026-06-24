@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Script principal pour exécuter tous les tests avec affichage clair"""
-
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -10,20 +7,23 @@ import time
 import json
 from datetime import datetime
 
+# CORRECTION : Forcer l'encodage UTF-8
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
 def print_header(title):
-    """Affiche un en-tête coloré"""
     print("\n" + "="*70)
     print(f"  {title}")
     print("="*70)
 
 def print_success(message):
-    print(f"{message}")
+    print(f"[OK] {message}")
 
 def print_error(message):
-    print(f"{message}")
+    print(f"[FAIL] {message}")
 
 def print_info(message):
-    print(f"ℹ{message}")
+    print(f"ℹ {message}")
 
 def run_test(script_name, description):
     """Exécute un test et affiche les résultats"""
@@ -31,9 +31,14 @@ def run_test(script_name, description):
     
     start_time = time.time()
     
-    # Exécuter le script
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), script_name)
+    
+    if not os.path.exists(script_path):
+        print_error(f"Script non trouve: {script_path}")
+        return False, ""
+    
     result = subprocess.run(
-        [sys.executable, script_name],
+        [sys.executable, script_path],
         capture_output=True,
         text=True,
         cwd=os.path.dirname(os.path.abspath(__file__))
@@ -41,44 +46,44 @@ def run_test(script_name, description):
     
     elapsed = time.time() - start_time
     
-    # Afficher la sortie
     if result.stdout:
         print(result.stdout)
     
-    # Afficher les erreurs éventuelles
     if result.stderr:
         print("SORTIE D'ERREUR:")
         print(result.stderr)
     
-    # Déterminer le succès
     success = result.returncode == 0
     if success:
-        print_success(f"Test terminé avec succès (temps: {elapsed:.2f}s)")
+        print_success(f"Test termine (temps: {elapsed:.2f}s)")
     else:
-        print_error(f"Test échoué (code: {result.returncode}, temps: {elapsed:.2f}s)")
+        print_error(f"Test echoue (code: {result.returncode})")
     
     return success, result.stdout
 
 def main():
     print_header("SUITE DE TESTS - PROJET CLASSIFICATION D'IMAGES")
-    print_info(f"Début des tests: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print_info(f"De but des tests: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # CORRECTION : Utiliser le bon chemin
+    tests_dir = os.path.dirname(os.path.abspath(__file__))
     
     # Vérifier que les données existent
-    if not os.path.exists('tests/data/test_data.npz'):
-        print_info("Génération des données de test...")
-        subprocess.run([sys.executable, 'tests/generate_test_data.py'])
+    if not os.path.exists(os.path.join(tests_dir, "data", "test_data.npz")):
+        print_info("Generation des donnees de test...")
+        subprocess.run([sys.executable, "generate_test_data.py"], cwd=tests_dir)
     
     tests = [
-        ("test_linear.py", "Test du modèle linéaire"),
+        ("test_linear.py", "Test du modele lineaire"),
         ("test_mlp.py", "Test du MLP"),
     ]
     
     results = []
     
     for script, description in tests:
-        script_path = os.path.join('tests', script)
+        script_path = os.path.join(tests_dir, script)
         if os.path.exists(script_path):
-            success, output = run_test(script_path, description)
+            success, output = run_test(script, description)
             results.append({
                 'name': description,
                 'script': script,
@@ -86,7 +91,7 @@ def main():
                 'time': datetime.now().isoformat()
             })
         else:
-            print_error(f"Script non trouvé: {script_path}")
+            print_error(f"Script non trouve: {script_path}")
             results.append({
                 'name': description,
                 'script': script,
@@ -94,30 +99,30 @@ def main():
                 'error': 'File not found'
             })
     
-    # Résumé final
-    print_header("RÉSUMÉ DES TESTS")
+    print_header("RESUME DES TESTS")
     
     passed = sum(1 for r in results if r['success'])
     total = len(results)
     
     for r in results:
-        status = "ok" if r['success'] else "ko"
+        status = "[OK]" if r['success'] else "[FAIL]"
         print(f"  {status} {r['name']}")
     
     print("\n" + "-"*70)
-    print(f"  Total: {passed}/{total} tests réussis")
+    print(f"  Total: {passed}/{total} tests reussis")
     
     if passed == total:
-        print_success("TOUS LES TESTS SONT RÉUSSIS !")
+        print_success("TOUS LES TESTS SONT REUSSIS !")
     else:
-        print_error(f"{total - passed} test(s) ont échoué")
+        print_error(f"{total - passed} test(s) ont echoue")
     
-    print(f"\nℹFin des tests: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\nℹ Fin des tests: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Sauvegarder les résultats
-    with open('tests/results.json', 'w') as f:
+    # CORRECTION : Sauvegarder dans le bon dossier
+    results_file = os.path.join(tests_dir, "results.json")
+    with open(results_file, 'w') as f:
         json.dump(results, f, indent=2)
-    print_info("Résultats sauvegardés dans tests/results.json")
+    print_info(f"Resultats sauvegardes dans {results_file}")
 
 if __name__ == "__main__":
     main()
