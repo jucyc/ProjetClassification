@@ -38,13 +38,16 @@ class LinearModel:
                 print(f"     - {path}")
             print("\n   Solution: Compilez la bibliothèque avec:")
             print("     cd lib")
-            print("     gcc -shared -o libml.dll src/linear_model.c src/perceptron.c src/mlp.c -Iinclude -O2")
+            print("     gcc -shared -fPIC -o libml.so src/linear_model.c -Iinclude -lm -O2")
             raise RuntimeError("Impossible de charger la bibliothèque")
         
         # Définir les types des fonctions
         self.lib.linear_create.argtypes = [ctypes.c_int, ctypes.c_int]
         self.lib.linear_create.restype = ctypes.c_void_p
         
+        # IMPORTANT : linear_train en C prend 6 arguments (pas de "verbose"),
+        # le dernier parametre est n_iterations (nombre de tirages aleatoires
+        # pour la regle de Rosenblatt, PAS des epochs sur tout le dataset).
         self.lib.linear_train.argtypes = [
             ctypes.c_void_p,
             ctypes.POINTER(ctypes.POINTER(ctypes.c_float)),
@@ -52,14 +55,16 @@ class LinearModel:
             ctypes.c_int,
             ctypes.c_float,
             ctypes.c_int,
-            ctypes.c_int
         ]
         
         self.lib.linear_predict.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float)]
         self.lib.linear_predict.restype = ctypes.c_int
         
-        self.lib.linear_predict_proba.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float)]
-        self.lib.linear_predict_proba.restype = ctypes.POINTER(ctypes.c_float)
+        # Scores bruts W.X par perceptron (PAS des probabilites : notre
+        # modele est un Perceptron/Rosenblatt, pas une regression
+        # logistique, donc pas de softmax cote C).
+        self.lib.linear_predict_scores.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float)]
+        self.lib.linear_predict_scores.restype = ctypes.POINTER(ctypes.c_float)
         
         self.lib.linear_save.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
         self.lib.linear_load.argtypes = [ctypes.c_char_p]
@@ -72,7 +77,13 @@ class LinearModel:
         self.n_classes = n_classes
         print(f"Modèle créé: {n_features} features, {n_classes} classes")
     
-    def train(self, X, y, learning_rate=0.01, epochs=1000, verbose=1):
+    def train(self, X, y, learning_rate=0.01, n_iterations=10000):
+        """
+        Entraine le modele par la regle de Rosenblatt (one-vs-rest).
+        n_iterations = nombre de tirages aleatoires d'exemples PAR CLASSE
+        (pas des epochs sur tout le dataset comme avant : on suit la
+        logique du cours, un exemple tire au hasard a chaque iteration).
+        """
         n_samples = len(X)
         
         # Convertir X en tableau de pointeurs
@@ -83,16 +94,17 @@ class LinearModel:
         y_ptr = (ctypes.c_int * n_samples)(*y)
         
         self.lib.linear_train(self.obj, X_ptr, y_ptr, n_samples, 
-                              learning_rate, epochs, verbose)
+                              learning_rate, n_iterations)
     
     def predict(self, x):
         x_ptr = (ctypes.c_float * len(x))(*x)
         return self.lib.linear_predict(self.obj, x_ptr)
     
-    def predict_proba(self, x):
+    def predict_scores(self, x):
+        """Scores bruts W.X de chaque perceptron (pas des probabilites)."""
         x_ptr = (ctypes.c_float * len(x))(*x)
-        proba_ptr = self.lib.linear_predict_proba(self.obj, x_ptr)
-        return [proba_ptr[i] for i in range(self.n_classes)]
+        scores_ptr = self.lib.linear_predict_scores(self.obj, x_ptr)
+        return [scores_ptr[i] for i in range(self.n_classes)]
     
     def save(self, filename):
         self.lib.linear_save(self.obj, filename.encode('utf-8'))

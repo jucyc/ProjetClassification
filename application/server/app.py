@@ -52,7 +52,7 @@ def predict():
         
         # Prédiction
         pred_class = model.predict(list(features))
-        probabilities = model.predict_proba(list(features))
+        scores = model.predict_scores(list(features))
         
         # Nettoyer
         os.remove(temp_path)
@@ -60,8 +60,8 @@ def predict():
         return jsonify({
             "prediction": class_names[pred_class],
             "class_id": int(pred_class),
-            "probabilities": {
-                class_names[i]: float(probabilities[i])
+            "scores": {
+                class_names[i]: float(scores[i])
                 for i in range(3)
             }
         })

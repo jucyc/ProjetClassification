@@ -4,31 +4,41 @@
 #include <math.h>
 #include "../include/linear_model.h"
 
-// Initialisation aléatoire des poids
-static void init_weights(float** weights, int n_classes, int n_features) {
-    for (int i = 0; i < n_classes; i++) {
-        for (int j = 0; j < n_features; j++) {
-            weights[i][j] = ((float)rand() / RAND_MAX - 0.5f) * 0.01f;
+/*
+ * Implementation : Perceptron(s) + regle de Rosenblatt, one-vs-rest.
+ * Voir linear_model.h pour les explications detaillees et les references
+ * au cours.
+ *
+ * Convention interne : le biais est stocke comme un poids supplementaire
+ * weights[c][0], applique a une entree fictive x0 = 1 (comme dans les
+ * slides : "Xk les parametres de l'exemple k ET le biais x0_k = 1").
+ * Donc weights[c] a (n_features + 1) cases :
+ *   weights[c][0]            -> biais
+ *   weights[c][1..n_features] -> poids des vraies features
+ */
+
+// Initialisation aleatoire des poids dans [-1, 1], comme demande par les slides
+static void init_weights(float** weights, int n_classes, int n_weights_per_class) {
+    for (int c = 0; c < n_classes; c++) {
+        for (int j = 0; j < n_weights_per_class; j++) {
+            weights[c][j] = ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
         }
     }
 }
 
-// Fonction softmax
-static void softmax(float* scores, float* probs, int n_classes) {
-    float max_score = scores[0];
-    for (int i = 1; i < n_classes; i++) {
-        if (scores[i] > max_score) max_score = scores[i];
+// Score brut W.X pour un perceptron donne (x ne contient PAS le biais,
+// on l'ajoute nous-memes ici)
+static float dot_with_bias(float* w, float* x, int n_features) {
+    float score = w[0]; // biais * 1
+    for (int j = 0; j < n_features; j++) {
+        score += w[j + 1] * x[j];
     }
-    
-    float sum = 0.0f;
-    for (int i = 0; i < n_classes; i++) {
-        probs[i] = expf(scores[i] - max_score);
-        sum += probs[i];
-    }
-    
-    for (int i = 0; i < n_classes; i++) {
-        probs[i] /= sum;
-    }
+    return score;
+}
+
+// g(x) = signe(W.X), sortie en -1 / +1 (cf slides p.62-65)
+static float sign_output(float score) {
+    return (score >= 0.0f) ? 1.0f : -1.0f;
 }
 
 LinearModel* linear_create(int n_features, int n_classes) {
@@ -36,161 +46,129 @@ LinearModel* linear_create(int n_features, int n_classes) {
     model->n_features = n_features;
     model->n_classes = n_classes;
     model->is_trained = 0;
-    
-    // Allocation des poids
+
+    int n_weights_per_class = n_features + 1; // +1 pour le biais
+
     model->weights = (float**)malloc(n_classes * sizeof(float*));
-    for (int i = 0; i < n_classes; i++) {
-        model->weights[i] = (float*)malloc(n_features * sizeof(float));
+    for (int c = 0; c < n_classes; c++) {
+        model->weights[c] = (float*)malloc(n_weights_per_class * sizeof(float));
     }
-    
-    model->biases = (float*)malloc(n_classes * sizeof(float));
-    
-    init_weights(model->weights, n_classes, n_features);
-    memset(model->biases, 0, n_classes * sizeof(float));
-    
+
+    init_weights(model->weights, n_classes, n_weights_per_class);
+
     return model;
 }
 
+/*
+ * Entrainement par la regle de Rosenblatt, en one-vs-rest.
+ *
+ * Pour chaque perceptron c (un par classe) :
+ *   On repete n_iterations fois :
+ *     - tirer un exemple k au hasard
+ *     - Yk = +1 si l'exemple k appartient a la classe c, sinon -1
+ *     - calculer g(Xk) = signe(W_c . Xk)
+ *     - W_c <- W_c + alpha * (Yk - g(Xk)) * Xk   (avec x0 = 1 pour le biais)
+ *
+ * C'est exactement la regle du notebook d'exemple fourni par Vidal
+ * (_Exemple__Classification_Linéaire_en_python), appliquee une fois par
+ * classe pour gerer le multi-classes.
+ */
 void linear_train(LinearModel* model, float** X, int* y, int n_samples,
-                  float learning_rate, int epochs) {
-    float* scores = (float*)malloc(model->n_classes * sizeof(float));
-    float* probs = (float*)malloc(model->n_classes * sizeof(float));
-    float* gradients_w = (float*)calloc(model->n_classes * model->n_features, sizeof(float));
-    float* gradients_b = (float*)calloc(model->n_classes, sizeof(float));
-    
-    for (int epoch = 0; epoch < epochs; epoch++) {
-        // Remettre les gradients à zéro
-        memset(gradients_w, 0, model->n_classes * model->n_features * sizeof(float));
-        memset(gradients_b, 0, model->n_classes * sizeof(float));
-        
-        float total_loss = 0.0f;
-        
-        // Calcul des gradients sur tout le batch
-        for (int i = 0; i < n_samples; i++) {
-            // Forward pass
-            for (int c = 0; c < model->n_classes; c++) {
-                scores[c] = model->biases[c];
-                for (int j = 0; j < model->n_features; j++) {
-                    scores[c] += model->weights[c][j] * X[i][j];
-                }
-            }
-            
-            softmax(scores, probs, model->n_classes);
-            
-            // Cross-entropy loss
-            total_loss += -logf(probs[y[i]]);
-            
-            // Backward pass
-            for (int c = 0; c < model->n_classes; c++) {
-                float error = probs[c] - (c == y[i] ? 1.0f : 0.0f);
-                gradients_b[c] += error;
-                for (int j = 0; j < model->n_features; j++) {
-                    gradients_w[c * model->n_features + j] += error * X[i][j];
-                }
-            }
-        }
-        
-        // Mise à jour des poids
-        for (int c = 0; c < model->n_classes; c++) {
-            model->biases[c] -= learning_rate * gradients_b[c] / n_samples;
+                  float learning_rate, int n_iterations) {
+    for (int c = 0; c < model->n_classes; c++) {
+        float* w = model->weights[c];
+
+        for (int it = 0; it < n_iterations; it++) {
+            int k = rand() % n_samples;
+            float* xk = X[k];
+
+            float Yk = (y[k] == c) ? 1.0f : -1.0f;
+            float score = dot_with_bias(w, xk, model->n_features);
+            float gXk = sign_output(score);
+
+            float error = learning_rate * (Yk - gXk);
+
+            // Mise a jour du biais (x0 = 1) puis des vrais poids
+            w[0] += error;
             for (int j = 0; j < model->n_features; j++) {
-                model->weights[c][j] -= learning_rate * gradients_w[c * model->n_features + j] / n_samples;
+                w[j + 1] += error * xk[j];
             }
         }
-        
-        // Affichage de la loss tous les 100 epochs
-        if (epoch % 100 == 0) {
-            printf("Epoch %d, Loss: %.4f\n", epoch, total_loss / n_samples);
-        }
+
+        printf("Perceptron classe %d entraine (%d iterations)\n", c, n_iterations);
     }
-    
+
     model->is_trained = 1;
-    
-    free(scores);
-    free(probs);
-    free(gradients_w);
-    free(gradients_b);
 }
 
+/*
+ * Prediction multi-classes : on calcule le score W.X de chaque perceptron
+ * et on garde la classe dont le perceptron est le plus confiant (score le
+ * plus eleve), comme dans le notebook "Multi Linear 3 classes" fourni par
+ * Vidal.
+ */
 int linear_predict(LinearModel* model, float* x) {
-    float* scores = (float*)malloc(model->n_classes * sizeof(float));
-    
-    for (int c = 0; c < model->n_classes; c++) {
-        scores[c] = model->biases[c];
-        for (int j = 0; j < model->n_features; j++) {
-            scores[c] += model->weights[c][j] * x[j];
-        }
-    }
-    
-    int pred_class = 0;
-    float max_score = scores[0];
+    int best_class = 0;
+    float best_score = dot_with_bias(model->weights[0], x, model->n_features);
+
     for (int c = 1; c < model->n_classes; c++) {
-        if (scores[c] > max_score) {
-            max_score = scores[c];
-            pred_class = c;
+        float score = dot_with_bias(model->weights[c], x, model->n_features);
+        if (score > best_score) {
+            best_score = score;
+            best_class = c;
         }
     }
-    
-    free(scores);
-    return pred_class;
+
+    return best_class;
 }
 
-float* linear_predict_proba(LinearModel* model, float* x) {
+float* linear_predict_scores(LinearModel* model, float* x) {
     float* scores = (float*)malloc(model->n_classes * sizeof(float));
-    float* probs = (float*)malloc(model->n_classes * sizeof(float));
-    
     for (int c = 0; c < model->n_classes; c++) {
-        scores[c] = model->biases[c];
-        for (int j = 0; j < model->n_features; j++) {
-            scores[c] += model->weights[c][j] * x[j];
-        }
+        scores[c] = dot_with_bias(model->weights[c], x, model->n_features);
     }
-    
-    softmax(scores, probs, model->n_classes);
-    free(scores);
-    return probs;
+    return scores;
 }
 
 void linear_save(LinearModel* model, const char* filename) {
     FILE* f = fopen(filename, "wb");
     if (!f) return;
-    
+
     fwrite(&model->n_features, sizeof(int), 1, f);
     fwrite(&model->n_classes, sizeof(int), 1, f);
-    
-    for (int i = 0; i < model->n_classes; i++) {
-        fwrite(model->weights[i], sizeof(float), model->n_features, f);
+
+    int n_weights_per_class = model->n_features + 1;
+    for (int c = 0; c < model->n_classes; c++) {
+        fwrite(model->weights[c], sizeof(float), n_weights_per_class, f);
     }
-    fwrite(model->biases, sizeof(float), model->n_classes, f);
-    
+
     fclose(f);
 }
 
 LinearModel* linear_load(const char* filename) {
     FILE* f = fopen(filename, "rb");
     if (!f) return NULL;
-    
+
     int n_features, n_classes;
     fread(&n_features, sizeof(int), 1, f);
     fread(&n_classes, sizeof(int), 1, f);
-    
+
     LinearModel* model = linear_create(n_features, n_classes);
-    
-    for (int i = 0; i < n_classes; i++) {
-        fread(model->weights[i], sizeof(float), n_features, f);
+
+    int n_weights_per_class = n_features + 1;
+    for (int c = 0; c < n_classes; c++) {
+        fread(model->weights[c], sizeof(float), n_weights_per_class, f);
     }
-    fread(model->biases, sizeof(float), n_classes, f);
-    
+
     model->is_trained = 1;
     fclose(f);
     return model;
 }
 
 void linear_free(LinearModel* model) {
-    for (int i = 0; i < model->n_classes; i++) {
-        free(model->weights[i]);
+    for (int c = 0; c < model->n_classes; c++) {
+        free(model->weights[c]);
     }
     free(model->weights);
-    free(model->biases);
     free(model);
 }
