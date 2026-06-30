@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Classification de Monuments</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            background: #f4f6f8;
+            color: #222;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            font-size: 22px;
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            margin-bottom: 15px;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .error {
+            color: #e74c3c;
+            margin-top: 15px;
+        }
+        .result {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .result img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .predicted {
+            font-size: 18px;
+            font-weight: bold;
+            color: #27ae60;
+            margin-bottom: 10px;
+        }
+        .prob-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .prob-label {
+            width: 130px;
+            font-size: 14px;
+        }
+        .prob-track {
+            flex: 1;
+            background: #eee;
+            border-radius: 4px;
+            height: 16px;
+            overflow: hidden;
+            margin-right: 8px;
+        }
+        .prob-fill {
+            background: #3498db;
+            height: 100%;
+        }
+        .prob-value {
+            font-size: 13px;
+            width: 45px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Classification de Monuments</h1>
+        <p>Taj Mahal · Grande Muraille de Chine · Christ Rédempteur</p>
+
+        <form method="POST" action="/predict" enctype="multipart/form-data">
+            <input type="file" name="image" accept=".png,.jpg,.jpeg" required>
+            <br>
+            <button type="submit">Analyser l'image</button>
+        </form>
+
+        {% if error %}
+        <p class="error">{{ error }}</p>
+        {% endif %}
+
+        {% if result %}
+        <div class="result">
+            <img src="/{{ image_path }}" alt="Image envoyée">
+            <p class="predicted">Prédiction : {{ result.class_name }} ({{ result.confidence }}%)</p>
+
+            {% for class_name, prob in result.all_probs.items() %}
+            <div class="prob-bar">
+                <span class="prob-label">{{ class_name }}</span>
+                <div class="prob-track">
+                    <div class="prob-fill" style="width: {{ prob }}%;"></div>
+                </div>
+                <span class="prob-value">{{ prob }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

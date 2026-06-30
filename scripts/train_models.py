@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import numpy as np
 import sys
 import os
@@ -229,9 +232,15 @@ def train_linear_model():
     print("\nRapport de classification:")
     print(classification_report(y_test, y_pred, target_names=processor.class_names, zero_division=0))
     
-    # Sauvegarde
+    # Sauvegarde du modèle
     os.makedirs('data/models', exist_ok=True)
     model.save('data/models/linear_model_pure.npz')
+
+    # Sauvegarde des stats de normalisation (indispensables pour l'inférence
+    # sur de nouvelles images dans l'application client)
+    np.savez('data/models/normalization_stats.npz',
+             mean=processor.mean, std=processor.std)
+    print("Stats de normalisation sauvegardées: data/models/normalization_stats.npz")
     
     # Générer les graphiques
     generate_all_graphs(model, X_test, y_test, y_pred, processor.class_names, y)
