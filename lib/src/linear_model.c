@@ -4,20 +4,6 @@
 #include <math.h>
 #include "../include/linear_model.h"
 
-/*
- * Implementation : Perceptron(s) + regle de Rosenblatt, one-vs-rest.
- * Voir linear_model.h pour les explications detaillees et les references
- * au cours.
- *
- * Convention interne : le biais est stocke comme un poids supplementaire
- * weights[c][0], applique a une entree fictive x0 = 1 (comme dans les
- * slides : "Xk les parametres de l'exemple k ET le biais x0_k = 1").
- * Donc weights[c] a (n_features + 1) cases :
- *   weights[c][0]            -> biais
- *   weights[c][1..n_features] -> poids des vraies features
- */
-
-// Initialisation aleatoire des poids dans [-1, 1], comme demande par les slides
 static void init_weights(float** weights, int n_classes, int n_weights_per_class) {
     for (int c = 0; c < n_classes; c++) {
         for (int j = 0; j < n_weights_per_class; j++) {
@@ -26,17 +12,14 @@ static void init_weights(float** weights, int n_classes, int n_weights_per_class
     }
 }
 
-// Score brut W.X pour un perceptron donne (x ne contient PAS le biais,
-// on l'ajoute nous-memes ici)
 static float dot_with_bias(float* w, float* x, int n_features) {
-    float score = w[0]; // biais * 1
+    float score = w[0];
     for (int j = 0; j < n_features; j++) {
         score += w[j + 1] * x[j];
     }
     return score;
 }
 
-// g(x) = signe(W.X), sortie en -1 / +1 (cf slides p.62-65)
 static float sign_output(float score) {
     return (score >= 0.0f) ? 1.0f : -1.0f;
 }
@@ -47,7 +30,7 @@ LinearModel* linear_create(int n_features, int n_classes) {
     model->n_classes = n_classes;
     model->is_trained = 0;
 
-    int n_weights_per_class = n_features + 1; // +1 pour le biais
+    int n_weights_per_class = n_features + 1;
 
     model->weights = (float**)malloc(n_classes * sizeof(float*));
     for (int c = 0; c < n_classes; c++) {
@@ -59,22 +42,9 @@ LinearModel* linear_create(int n_features, int n_classes) {
     return model;
 }
 
-/*
- * Entrainement par la regle de Rosenblatt, en one-vs-rest.
- *
- * Pour chaque perceptron c (un par classe) :
- *   On repete n_iterations fois :
- *     - tirer un exemple k au hasard
- *     - Yk = +1 si l'exemple k appartient a la classe c, sinon -1
- *     - calculer g(Xk) = signe(W_c . Xk)
- *     - W_c <- W_c + alpha * (Yk - g(Xk)) * Xk   (avec x0 = 1 pour le biais)
- *
- * C'est exactement la regle du notebook d'exemple fourni par Vidal
- * (_Exemple__Classification_Linéaire_en_python), appliquee une fois par
- * classe pour gerer le multi-classes.
- */
-void linear_train(LinearModel* model, float** X, int* y, int n_samples,
-                  float learning_rate, int n_iterations) {
+
+void linear_train(LinearModel* model, float** X, int* y, int n_samples, float learning_rate, int n_iterations) 
+{
     for (int c = 0; c < model->n_classes; c++) {
         float* w = model->weights[c];
 
@@ -88,7 +58,6 @@ void linear_train(LinearModel* model, float** X, int* y, int n_samples,
 
             float error = learning_rate * (Yk - gXk);
 
-            // Mise a jour du biais (x0 = 1) puis des vrais poids
             w[0] += error;
             for (int j = 0; j < model->n_features; j++) {
                 w[j + 1] += error * xk[j];

@@ -1,259 +1,193 @@
-#include "mlp.h"
-#include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
+#include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <math.h>
+#include "../include/mlp.h"
 
-static double sigmoid(double x) {
-    return 1.0 / (1.0 + exp(-x));
-}
+MLP* mlp_create(int* npl, int n_layers) {
+    MLP* model = (MLP*)malloc(sizeof(MLP));
+    model->n_layers = n_layers;
+    model->L = n_layers - 1;
+    model->is_trained = 0;
 
-static double sigmoid_deriv(double x) {
-    double s = sigmoid(x);
-    return s * (1.0 - s);
-}
+    model->d = (int*)malloc(n_layers * sizeof(int));
+    for (int l = 0; l < n_layers; l++) {
+        model->d[l] = npl[l];
+    }
 
-static double uniform() {
-    return ((double)rand() / RAND_MAX) * 2.0 - 1.0;
-}
+    model->W = (double***)malloc((model->L + 1) * sizeof(double**));
+    model->W[0] = NULL;
 
-MLP* mlp_create(int input_size, int hidden_size, int output_size) {
-    MLP* net = (MLP*)malloc(sizeof(MLP));
-    if (!net) return NULL;
-    
-    net->input_size = input_size;
-    net->hidden_size = hidden_size;
-    net->output_size = output_size;
-    
-    double scale_in = sqrt(2.0 / input_size);
-    double scale_hid = sqrt(2.0 / hidden_size);
-    
-    net->W1 = (double*)malloc(input_size * hidden_size * sizeof(double));
-    net->b1 = (double*)calloc(hidden_size, sizeof(double));
-    net->W2 = (double*)malloc(hidden_size * output_size * sizeof(double));
-    net->b2 = (double*)calloc(output_size, sizeof(double));
-    
-    if (!net->W1 || !net->b1 || !net->W2 || !net->b2) {
-        mlp_destroy(net);
-        return NULL;
-    }
-    
-    for (int i = 0; i < input_size * hidden_size; i++)
-        net->W1[i] = uniform() * scale_in;
-    for (int i = 0; i < hidden_size * output_size; i++)
-        net->W2[i] = uniform() * scale_hid;
-    
-    return net;
-}
+    for (int l = 1; l <= model->L; l++) {
+        int rows = model->d[l - 1] + 1; // +1 pour le biais de la couche l-1
+        int cols = model->d[l] + 1;     // +1 pour l'indice 0 (non utilise) du neurone j
 
-void mlp_destroy(MLP* net) {
-    if (net) {
-        if (net->W1) free(net->W1);
-        if (net->b1) free(net->b1);
-        if (net->W2) free(net->W2);
-        if (net->b2) free(net->b2);
-        free(net);
-    }
-}
-
-static void forward(MLP* net, double* x, double* h, double* out) {
-    for (int j = 0; j < net->hidden_size; j++) {
-        double z = net->b1[j];
-        for (int i = 0; i < net->input_size; i++) {
-            z += net->W1[i * net->hidden_size + j] * x[i];
-        }
-        h[j] = sigmoid(z);
-    }
-    
-    double max_val = -1e18;
-    for (int k = 0; k < net->output_size; k++) {
-        double z = net->b2[k];
-        for (int j = 0; j < net->hidden_size; j++) {
-            z += net->W2[j * net->output_size + k] * h[j];
-        }
-        out[k] = z;
-        if (z > max_val) max_val = z;
-    }
-    
-    double sum = 0;
-    for (int k = 0; k < net->output_size; k++) {
-        out[k] = exp(out[k] - max_val);
-        sum += out[k];
-    }
-    for (int k = 0; k < net->output_size; k++) {
-        out[k] /= sum;
-    }
-}
-
-int mlp_predict(MLP* net, double* x) {
-    double* h = (double*)malloc(net->hidden_size * sizeof(double));
-    double* out = (double*)malloc(net->output_size * sizeof(double));
-    if (!h || !out) return 0;
-    
-    forward(net, x, h, out);
-    
-    int pred = 0;
-    for (int k = 1; k < net->output_size; k++) {
-        if (out[k] > out[pred]) pred = k;
-    }
-    
-    free(h);
-    free(out);
-    return pred;
-}
-
-double mlp_evaluate(MLP* net, double* X, int* y, int n_samples) {
-    int correct = 0;
-    for (int i = 0; i < n_samples; i++) {
-        double* x = X + (long)i * net->input_size;
-        if (mlp_predict(net, x) == y[i]) {
-            correct++;
-        }
-    }
-    return 100.0 * correct / n_samples;
-}
-
-void mlp_train(MLP* net, double* X, int* y, int n_samples,
-               double lr, int epochs, int batch_size) {
-    double *h = (double*)malloc(net->hidden_size * sizeof(double));
-    double *out = (double*)malloc(net->output_size * sizeof(double));
-    double *grad_W1 = (double*)calloc(net->input_size * net->hidden_size, sizeof(double));
-    double *grad_b1 = (double*)calloc(net->hidden_size, sizeof(double));
-    double *grad_W2 = (double*)calloc(net->hidden_size * net->output_size, sizeof(double));
-    double *grad_b2 = (double*)calloc(net->output_size, sizeof(double));
-    
-    if (!h || !out || !grad_W1 || !grad_b1 || !grad_W2 || !grad_b2) {
-        printf("Memory allocation error\n");
-        return;
-    }
-    
-    srand((unsigned int)time(NULL));
-    
-    for (int epoch = 0; epoch < epochs; epoch++) {
-        memset(grad_W1, 0, net->input_size * net->hidden_size * sizeof(double));
-        memset(grad_b1, 0, net->hidden_size * sizeof(double));
-        memset(grad_W2, 0, net->hidden_size * net->output_size * sizeof(double));
-        memset(grad_b2, 0, net->output_size * sizeof(double));
-        
-        int* idx = (int*)malloc(n_samples * sizeof(int));
-        for (int i = 0; i < n_samples; i++) idx[i] = i;
-        for (int i = n_samples - 1; i > 0; i--) {
-            int j = rand() % (i + 1);
-            int tmp = idx[i];
-            idx[i] = idx[j];
-            idx[j] = tmp;
-        }
-        
-        for (int b = 0; b < n_samples; b++) {
-            int sample_idx = idx[b];
-            double* x = X + (long)sample_idx * net->input_size;
-            
-            forward(net, x, h, out);
-            
-            double* delta_out = (double*)malloc(net->output_size * sizeof(double));
-            for (int k = 0; k < net->output_size; k++) {
-                delta_out[k] = out[k] - (k == y[sample_idx] ? 1.0 : 0.0);
-            }
-            
-            for (int j = 0; j < net->hidden_size; j++) {
-                for (int k = 0; k < net->output_size; k++) {
-                    grad_W2[j * net->output_size + k] += delta_out[k] * h[j];
+        model->W[l] = (double**)malloc(rows * sizeof(double*));
+        for (int i = 0; i < rows; i++) {
+            model->W[l][i] = (double*)malloc(cols * sizeof(double));
+            for (int j = 0; j < cols; j++) {
+                if (j == 0) {
+                    model->W[l][i][j] = 0.0; // pas de poids vers un "biais" de sortie
+                } else {
+                    // poids aleatoires dans [-1, 1]
+                    model->W[l][i][j] = ((double)rand() / RAND_MAX) * 2.0 - 1.0;
                 }
             }
-            for (int k = 0; k < net->output_size; k++) {
-                grad_b2[k] += delta_out[k];
-            }
-            
-            double* delta_hid = (double*)calloc(net->hidden_size, sizeof(double));
-            for (int j = 0; j < net->hidden_size; j++) {
-                for (int k = 0; k < net->output_size; k++) {
-                    delta_hid[j] += delta_out[k] * net->W2[j * net->output_size + k];
-                }
-                delta_hid[j] *= sigmoid_deriv(h[j]);
-            }
-            
-            for (int f = 0; f < net->input_size; f++) {
-                for (int j = 0; j < net->hidden_size; j++) {
-                    grad_W1[f * net->hidden_size + j] += delta_hid[j] * x[f];
-                }
-            }
-            for (int j = 0; j < net->hidden_size; j++) {
-                grad_b1[j] += delta_hid[j];
-            }
-            
-            free(delta_out);
-            free(delta_hid);
-        }
-        free(idx);
-        
-        double inv_batch = 1.0 / batch_size;
-        for (int i = 0; i < net->input_size * net->hidden_size; i++) {
-            net->W1[i] -= lr * grad_W1[i] * inv_batch;
-        }
-        for (int i = 0; i < net->hidden_size; i++) {
-            net->b1[i] -= lr * grad_b1[i] * inv_batch;
-        }
-        for (int i = 0; i < net->hidden_size * net->output_size; i++) {
-            net->W2[i] -= lr * grad_W2[i] * inv_batch;
-        }
-        for (int i = 0; i < net->output_size; i++) {
-            net->b2[i] -= lr * grad_b2[i] * inv_batch;
-        }
-        
-        if (epoch % 100 == 0 || epoch == epochs - 1) {
-            double acc = mlp_evaluate(net, X, y, n_samples);
-            printf("Epoch %d - Accuracy: %.2f%%\n", epoch, acc);
         }
     }
-    
-    free(h);
-    free(out);
-    free(grad_W1);
-    free(grad_b1);
-    free(grad_W2);
-    free(grad_b2);
+
+    model->X = (double**)malloc((model->L + 1) * sizeof(double*));
+    model->deltas = (double**)malloc((model->L + 1) * sizeof(double*));
+
+    for (int l = 0; l <= model->L; l++) {
+        int size = model->d[l] + 1; // +1 pour le neurone de biais virtuel (indice 0)
+        model->X[l] = (double*)malloc(size * sizeof(double));
+        model->deltas[l] = (double*)malloc(size * sizeof(double));
+
+        for (int j = 0; j < size; j++) {
+            model->X[l][j] = (j == 0) ? 1.0 : 0.0; // X[l][0] = 1.0 = biais, toujours
+            model->deltas[l][j] = 0.0;
+        }
+    }
+
+    return model;
 }
 
-void mlp_save(MLP* net, const char* path) {
-    FILE* f = fopen(path, "wb");
-    if (!f) {
-        printf("Error opening %s\n", path);
-        return;
+static void mlp_propagate(MLP* model, double* inputs) {
+    for (int j = 1; j <= model->d[0]; j++) {
+        model->X[0][j] = inputs[j - 1];
     }
-    fwrite(&net->input_size, sizeof(int), 1, f);
-    fwrite(&net->hidden_size, sizeof(int), 1, f);
-    fwrite(&net->output_size, sizeof(int), 1, f);
-    fwrite(net->W1, sizeof(double), net->input_size * net->hidden_size, f);
-    fwrite(net->b1, sizeof(double), net->hidden_size, f);
-    fwrite(net->W2, sizeof(double), net->hidden_size * net->output_size, f);
-    fwrite(net->b2, sizeof(double), net->output_size, f);
+
+    for (int l = 1; l <= model->L; l++) {
+        for (int j = 1; j <= model->d[l]; j++) {
+            double total = 0.0;
+            for (int i = 0; i <= model->d[l - 1]; i++) {
+                total += model->W[l][i][j] * model->X[l - 1][i];
+            }
+            model->X[l][j] = tanh(total);
+        }
+    }
+}
+
+double* mlp_predict_raw(MLP* model, double* x) {
+    mlp_propagate(model, x);
+    return &model->X[model->L][1];
+}
+
+int mlp_predict_class(MLP* model, double* x) {
+    double* out = mlp_predict_raw(model, x);
+    int best = 0;
+    double best_val = out[0];
+    for (int j = 1; j < model->d[model->L]; j++) {
+        if (out[j] > best_val) {
+            best_val = out[j];
+            best = j;
+        }
+    }
+    return best;
+}
+
+void mlp_train(MLP* model, double** X, double** Y, int n_samples,
+               double learning_rate, int n_iterations) {
+    int dL = model->d[model->L];
+
+    for (int it = 0; it < n_iterations; it++) {
+        int k = rand() % n_samples;
+        double* xk = X[k];
+        double* yk = Y[k];
+
+        mlp_propagate(model, xk);
+
+        for (int j = 1; j <= dL; j++) {
+            double xj = model->X[model->L][j];
+            model->deltas[model->L][j] = (1.0 - xj * xj) * (xj - yk[j - 1]);
+        }
+
+        for (int l = model->L; l >= 2; l--) {
+            for (int i = 1; i <= model->d[l - 1]; i++) {
+                double total = 0.0;
+                for (int j = 1; j <= model->d[l]; j++) {
+                    total += model->W[l][i][j] * model->deltas[l][j];
+                }
+                double xi = model->X[l - 1][i];
+                model->deltas[l - 1][i] = (1.0 - xi * xi) * total;
+            }
+        }
+
+        for (int l = 1; l <= model->L; l++) {
+            for (int i = 0; i <= model->d[l - 1]; i++) {
+                for (int j = 1; j <= model->d[l]; j++) {
+                    model->W[l][i][j] -= learning_rate * model->X[l - 1][i] * model->deltas[l][j];
+                }
+            }
+        }
+    }
+
+    model->is_trained = 1;
+    printf("MLP entraine (%d iterations)\n", n_iterations);
+}
+
+void mlp_save(MLP* model, const char* filename) {
+    FILE* f = fopen(filename, "wb");
+    if (!f) return;
+
+    fwrite(&model->n_layers, sizeof(int), 1, f);
+    fwrite(model->d, sizeof(int), model->n_layers, f);
+
+    for (int l = 1; l <= model->L; l++) {
+        int rows = model->d[l - 1] + 1;
+        int cols = model->d[l] + 1;
+        for (int i = 0; i < rows; i++) {
+            fwrite(model->W[l][i], sizeof(double), cols, f);
+        }
+    }
+
     fclose(f);
-    printf("Model saved: %s\n", path);
 }
 
-MLP* mlp_load(const char* path) {
-    FILE* f = fopen(path, "rb");
-    if (!f) {
-        printf("Error opening %s\n", path);
-        return NULL;
+MLP* mlp_load(const char* filename) {
+    FILE* f = fopen(filename, "rb");
+    if (!f) return NULL;
+
+    int n_layers;
+    fread(&n_layers, sizeof(int), 1, f);
+
+    int* npl = (int*)malloc(n_layers * sizeof(int));
+    fread(npl, sizeof(int), n_layers, f);
+
+    MLP* model = mlp_create(npl, n_layers);
+    free(npl);
+
+    for (int l = 1; l <= model->L; l++) {
+        int rows = model->d[l - 1] + 1;
+        int cols = model->d[l] + 1;
+        for (int i = 0; i < rows; i++) {
+            fread(model->W[l][i], sizeof(double), cols, f);
+        }
     }
-    int input_size, hidden_size, output_size;
-    fread(&input_size, sizeof(int), 1, f);
-    fread(&hidden_size, sizeof(int), 1, f);
-    fread(&output_size, sizeof(int), 1, f);
-    
-    MLP* net = mlp_create(input_size, hidden_size, output_size);
-    if (!net) {
-        fclose(f);
-        return NULL;
-    }
-    
-    fread(net->W1, sizeof(double), input_size * hidden_size, f);
-    fread(net->b1, sizeof(double), hidden_size, f);
-    fread(net->W2, sizeof(double), hidden_size * output_size, f);
-    fread(net->b2, sizeof(double), output_size, f);
+
+    model->is_trained = 1;
     fclose(f);
-    printf("Model loaded: %s\n", path);
-    return net;
+    return model;
+}
+
+void mlp_free(MLP* model) {
+    for (int l = 1; l <= model->L; l++) {
+        int rows = model->d[l - 1] + 1;
+        for (int i = 0; i < rows; i++) {
+            free(model->W[l][i]);
+        }
+        free(model->W[l]);
+    }
+    free(model->W);
+
+    for (int l = 0; l <= model->L; l++) {
+        free(model->X[l]);
+        free(model->deltas[l]);
+    }
+    free(model->X);
+    free(model->deltas);
+
+    free(model->d);
+    free(model);
 }

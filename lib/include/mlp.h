@@ -2,22 +2,26 @@
 #define MLP_H
 
 typedef struct {
-    int input_size;
-    int hidden_size;
-    int output_size;
-    double *W1;
-    double *b1;
-    double *W2;
-    double *b2;
+    int* d;          
+    int n_layers;     
+    int L;             //(L = n_layers - 1)
+    double*** W;
+    double** X;        
+    double** deltas;
+    int is_trained;
 } MLP;
 
-MLP* mlp_create(int input_size, int hidden_size, int output_size);
-void mlp_destroy(MLP* net);
-void mlp_train(MLP* net, double* X, int* y, int n_samples, 
-               double lr, int epochs, int batch_size);
-int mlp_predict(MLP* net, double* x);
-double mlp_evaluate(MLP* net, double* X, int* y, int n_samples);
-void mlp_save(MLP* net, const char* path);
-MLP* mlp_load(const char* path);
+MLP* mlp_create(int* npl, int n_layers);
+void mlp_free(MLP* model);
+
+void mlp_train(MLP* model, double** X, double** Y, int n_samples,
+               double learning_rate, int n_iterations);
+
+double* mlp_predict_raw(MLP* model, double* x);
+
+int mlp_predict_class(MLP* model, double* x);
+
+void mlp_save(MLP* model, const char* filename);
+MLP* mlp_load(const char* filename);
 
 #endif

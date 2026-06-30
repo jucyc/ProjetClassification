@@ -48,7 +48,7 @@ def predict():
     
     try:
         # Extraire les features
-        features = processor.extract_combined_features(temp_path)
+        features = processor.extract_features(temp_path)
         
         # Prédiction
         pred_class = model.predict(list(features))
