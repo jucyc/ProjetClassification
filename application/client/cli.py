@@ -20,9 +20,9 @@ class MLClient:
             print(f"\n=== RÉSULTAT DE LA PRÉDICTION ===")
             print(f"Image: {image_path}")
             print(f"Prédiction: {result['prediction']}")
-            print(f"Probabilités:")
-            for class_name, prob in result['probabilities'].items():
-                print(f"  - {class_name}: {prob:.2%}")
+            print(f"Scores:")
+            for class_name, score in result['scores'].items():
+                print(f"  - {class_name}: {score:.3f}")
             return result
         else:
             print(f"Erreur: {response.status_code}")
