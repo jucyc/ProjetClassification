@@ -3,7 +3,6 @@ import numpy as np
 import os
 import sys
 
-
 def _load_lib():
     if sys.platform == 'win32':
         lib_name = 'libml.dll'
@@ -71,8 +70,7 @@ class LinearModel:
         print(f"Modèle créé: {n_features} features, {n_classes} classes")
     
     def train(self, X, y, learning_rate=0.02, n_iterations=50000):
-        """     
-        Entraine le modele par la regle de Rosenblatt (one-vs-rest).
+        """ 
         n_iterations = nombre de tirages aleatoires d'exemples PAR CLASSE
         """
         n_samples = len(X)

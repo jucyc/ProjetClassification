@@ -4,11 +4,7 @@ from tqdm import tqdm
 import time
 
 def download_images_from_google(query, num_images, save_dir):
-    """
-    Télécharge des images depuis Google Images
-    Note: Cette fonction est simplifiée; pour un usage réel,
-    utilisez une API comme SerpAPI ou téléchargez manuellement
-    """
+   
     print(f"Téléchargement de {num_images} images pour '{query}'")
     os.makedirs(save_dir, exist_ok=True)
     

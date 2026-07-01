@@ -74,9 +74,6 @@ def predict():
 def train():
     from scripts.train_models import train_linear_model
     
-    # Cette fonction serait appelée pour ré-entraîner le modèle
-    # À implémenter complètement selon vos besoins
-    
     return jsonify({"message": "Fonction d'entraînement à implémenter"})
 
 if __name__ == '__main__':

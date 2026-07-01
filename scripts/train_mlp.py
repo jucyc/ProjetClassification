@@ -73,12 +73,6 @@ def generate_all_graphs(y_test, y_pred, class_names):
 
 
 def one_hot(labels, n_classes):
-    """
-    Encode des labels entiers en vecteurs one-hot -1.0/+1.0 (PAS 0/1).
-    Necessaire car le MLP a plusieurs neurones de sortie en -1/+1
-    (contrairement au modele lineaire qui a un perceptron separe par
-    classe, traite individuellement en one-vs-rest).
-    """
     out = []
     for label in labels:
         row = [-1.0] * n_classes
@@ -87,7 +81,7 @@ def one_hot(labels, n_classes):
     return out
 
 
-def train_mlp_model(hidden_layers=(32,), n_iterations=300000, learning_rate=0.01):
+def train_mlp_model(hidden_layers=(32,), n_iterations=30000, learning_rate=0.01):
     """
     hidden_layers : tuple des tailles des couches cachees, ex (32,) pour
     une seule couche cachee de 32 neurones, ou (64, 16) pour deux couches.
@@ -112,8 +106,6 @@ def train_mlp_model(hidden_layers=(32,), n_iterations=300000, learning_rate=0.01
 
     print(f"   Stats features: mean={X.mean():.3f}, std={X.std():.3f}")
 
-    # Split train/test (meme seed que train_models.py pour pouvoir
-    # comparer les deux modeles sur exactement le meme split)
     np.random.seed(42)
     n_samples = len(X)
     indices = np.random.permutation(n_samples)
@@ -126,7 +118,6 @@ def train_mlp_model(hidden_layers=(32,), n_iterations=300000, learning_rate=0.01
     print(f"\nTrain: {len(X_train)} images")
     print(f"Test: {len(X_test)} images")
 
-    # Architecture : [n_features, couches cachees..., n_classes]
     npl = [X.shape[1]] + list(hidden_layers) + [n_classes]
     print(f"\nArchitecture du MLP: {npl}")
 
@@ -137,7 +128,6 @@ def train_mlp_model(hidden_layers=(32,), n_iterations=300000, learning_rate=0.01
     model.train(X_train.tolist(), Y_train_onehot,
                 learning_rate=learning_rate, n_iterations=n_iterations)
 
-    # Évaluation
     y_pred = np.array([model.predict(x) for x in X_test.tolist()])
     accuracy = np.mean(y_pred == y_test)
 
@@ -146,18 +136,13 @@ def train_mlp_model(hidden_layers=(32,), n_iterations=300000, learning_rate=0.01
     print("\nRapport de classification:")
     print(classification_report(y_test, y_pred, target_names=processor.class_names, zero_division=0))
 
-    # Sauvegarde
     os.makedirs('data/models', exist_ok=True)
     model.save('data/models/mlp_model.bin')
 
-    # Générer les graphiques
     generate_all_graphs(y_test, y_pred, processor.class_names)
 
     return model, accuracy
 
 
 if __name__ == "__main__":
-    # Architecture par defaut : 1 couche cachee de 32 neurones.
-    # N'hesite pas a essayer d'autres tailles (ex hidden_layers=(64,) ou
-    # (64, 16)) pour voir l'impact sur la precision dans le rapport.
     train_mlp_model(hidden_layers=(32,), n_iterations=300000, learning_rate=0.01)

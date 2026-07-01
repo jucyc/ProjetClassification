@@ -70,12 +70,6 @@ void linear_train(LinearModel* model, float** X, int* y, int n_samples, float le
     model->is_trained = 1;
 }
 
-/*
- * Prediction multi-classes : on calcule le score W.X de chaque perceptron
- * et on garde la classe dont le perceptron est le plus confiant (score le
- * plus eleve), comme dans le notebook "Multi Linear 3 classes" fourni par
- * Vidal.
- */
 int linear_predict(LinearModel* model, float* x) {
     int best_class = 0;
     float best_score = dot_with_bias(model->weights[0], x, model->n_features);

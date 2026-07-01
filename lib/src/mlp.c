@@ -29,7 +29,6 @@ MLP* mlp_create(int* npl, int n_layers) {
                 if (j == 0) {
                     model->W[l][i][j] = 0.0; // pas de poids vers un "biais" de sortie
                 } else {
-                    // poids aleatoires dans [-1, 1]
                     model->W[l][i][j] = ((double)rand() / RAND_MAX) * 2.0 - 1.0;
                 }
             }
@@ -45,7 +44,7 @@ MLP* mlp_create(int* npl, int n_layers) {
         model->deltas[l] = (double*)malloc(size * sizeof(double));
 
         for (int j = 0; j < size; j++) {
-            model->X[l][j] = (j == 0) ? 1.0 : 0.0; // X[l][0] = 1.0 = biais, toujours
+            model->X[l][j] = (j == 0) ? 1.0 : 0.0;
             model->deltas[l][j] = 0.0;
         }
     }
