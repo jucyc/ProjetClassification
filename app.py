@@ -42,30 +42,11 @@ def softmax(scores):
 
 
 def predict_image(image_path):
-    # Extraction des features brutes
     features = processor.extract_features(image_path)
-
-    # Normalisation avec les stats du training (meme pipeline qu'a l'entrainement)
     features_normalized = (features - MEAN) / (STD + 1e-8)
-
-    # Prediction via notre lib C (RBF, k-means + pseudo-inverse)
     pred_class = model.predict(list(features_normalized))
-    scores = model.predict_scores(list(features_normalized))
-
-    # Conversion des scores bruts en pourcentages via softmax
-    probs = softmax(np.array(scores))
-
-    class_probs = {
-        processor.class_names[i]: round(float(probs[i]) * 100, 2)
-        for i in range(len(processor.class_names))
-    }
-
-    confidence = round(float(probs[pred_class]) * 100, 2)
-
     return {
-        'class_name': processor.class_names[pred_class],
-        'confidence': confidence,
-        'all_probs': class_probs
+        'class_name': processor.class_names[pred_class]
     }
 
 

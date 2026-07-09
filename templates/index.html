@@ -101,18 +101,8 @@
 
         {% if result %}
         <div class="result">
-            <img src="/{{ image_path }}" alt="Image envoyée">
-            <p class="predicted">Prédiction : {{ result.class_name }} ({{ result.confidence }}%)</p>
-
-            {% for class_name, prob in result.all_probs.items() %}
-            <div class="prob-bar">
-                <span class="prob-label">{{ class_name }}</span>
-                <div class="prob-track">
-                    <div class="prob-fill" style="width: {{ prob }}%;"></div>
-                </div>
-                <span class="prob-value">{{ prob }}%</span>
-            </div>
-            {% endfor %}
+        <img src="/{{ image_path }}" alt="Image envoyée">
+        <p class="predicted">Prédiction : {{ result.class_name }}</p>
         </div>
         {% endif %}
     </div>
